@@ -21,7 +21,7 @@ echo  [8]  Restore Default DNS (DHCP)
 echo  [9]  Optimize TCP/IP Settings (Gaming/Speed)
 echo  [10] Disable Windows Auto-Tuning
 echo  [11] Enable Windows Auto-Tuning
-echo  [12] Disable Large Send Offload (LSO)
+echo  [12] Disable TCP/IP Task Offloading (LSO, Checksum Offload)
 echo  [13] Enable QoS Packet Scheduler
 echo  [14] Show Current Network Info
 echo  [15] Run Network Diagnostics (netsh diag)
@@ -175,7 +175,8 @@ cls
 echo [*] Applying TCP/IP optimizations for speed and gaming...
 echo.
 :: Disable Nagle's algorithm (reduces latency for small packets)
-reg add "HKLM\SYSTEM\CurrentControlSet\Services\Tcpip\Parameters\Interfaces" /v "TcpAckFrequency" /t REG_DWORD /d 1 /f >nul 2>&1
+:: Note: Per-interface TcpAckFrequency must be set under each adapter's GUID subkey.
+:: The global key below applies a fallback default for all interfaces.
 reg add "HKLM\SYSTEM\CurrentControlSet\Services\Tcpip\Parameters" /v "TcpAckFrequency" /t REG_DWORD /d 1 /f >nul 2>&1
 reg add "HKLM\SYSTEM\CurrentControlSet\Services\Tcpip\Parameters" /v "TCPNoDelay" /t REG_DWORD /d 1 /f >nul 2>&1
 :: Set TTL to 64
@@ -219,7 +220,9 @@ goto MENU
 :: -------------------------------------------------------
 :DISABLE_LSO
 cls
-echo [*] Disabling Large Send Offload (LSO) via registry...
+echo [*] Disabling TCP/IP Task Offloading via registry...
+echo     (This disables LSO, checksum offload, and related offload features.)
+:: DisableTaskOffload turns off all TCP/IP task offloading, including LSO and checksum offload.
 reg add "HKLM\SYSTEM\CurrentControlSet\Services\Tcpip\Parameters" /v "DisableTaskOffload" /t REG_DWORD /d 1 /f
 echo.
 echo Done. Restart required.
@@ -260,7 +263,7 @@ echo [*] Running Network Shell Diagnostics...
 echo.
 netsh diag show all 2>nul
 if %errorlevel% neq 0 (
-    echo [!] netsh diag is not available on this Windows version.
+    echo [!] Network diagnostics command failed or is not available on this system.
     echo [*] Running basic connectivity check instead...
     echo.
     ping 8.8.8.8 -n 4
@@ -312,6 +315,8 @@ netsh int tcp set global timestamps=disabled >nul 2>&1
 echo  Done.
 
 echo [5/6] Disabling TCP Auto-Tuning...
+:: Auto-Tuning is disabled here to reduce latency spikes on typical home connections.
+:: On high-bandwidth/high-latency links this may reduce throughput; re-enable with option [11] if needed.
 netsh int tcp set global autotuninglevel=disabled >nul 2>&1
 echo  Done.
 
